@@ -64,6 +64,7 @@ object PerformanceRules {
         p.lowRam == true -> DeviceTier.LOW
         p.totalMemoryBytes != null && p.totalMemoryBytes in 1 until LOW_MEMORY_BYTES -> DeviceTier.LOW
         p.cpuCores != null && p.cpuCores in 1..2 -> DeviceTier.LOW
+        (p.totalMemoryBytes ?: 0) >= 7L * 1024 * MIB && (p.cpuCores ?: 0) >= 8 -> DeviceTier.HIGH
         (p.totalMemoryBytes ?: 0) >= LOW_MEMORY_BYTES && (p.cpuCores ?: 0) >= 4 &&
             p.sdkInt >= 31 && (p.mediaPerformanceClass ?: 0) >= 31 -> DeviceTier.HIGH
         else -> DeviceTier.MEDIUM

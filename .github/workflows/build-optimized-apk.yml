@@ -1,0 +1,89 @@
+name: Build Optimized APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build Arm64 Optimized APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Environment
+        run: |
+          echo "Flutter version:"
+          flutter --version
+          echo "Java version:"
+          java -version
+
+      - name: Prepare Prebuilt Runtime Assets
+        run: |
+          chmod +x tooling/fetch-runtime.sh tooling/build-apk.sh
+          ./tooling/fetch-runtime.sh
+
+      - name: Install Flutter Dependencies
+        run: |
+          cd app
+          flutter pub get
+
+      - name: Build Optimized Release APK
+        run: |
+          ./tooling/build-apk.sh -f arm64 --release
+
+      - name: Collect Output APK
+        id: collect
+        run: |
+          APK_PATH=$(find app/build/app/outputs/flutter-apk -name "*.apk" -not -name "*sha*" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: APK not found!"
+            exit 1
+          fi
+          echo "Found APK: $APK_PATH"
+          cp "$APK_PATH" dsh-go-arm64-optimized.apk
+          sha256sum dsh-go-arm64-optimized.apk > dsh-go-arm64-optimized.apk.sha256
+          cat dsh-go-arm64-optimized.apk.sha256
+
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-go-arm64-optimized
+          path: |
+            dsh-go-arm64-optimized.apk
+            dsh-go-arm64-optimized.apk.sha256
+          retention-days: 14
+
+      - name: Publish Release Asset (on Tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dsh-go-arm64-optimized.apk
+            dsh-go-arm64-optimized.apk.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

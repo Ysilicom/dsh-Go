@@ -97,6 +97,7 @@ class MainActivity : FlutterActivity() {
             window.isStatusBarContrastEnforced = false
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) window.setDecorFitsSystemWindows(false)
+        preferFastestDisplayMode()
         current = WeakReference(this)
         // After LaunchScreen read what this launch's splash showed: the next ones show the icon
         // (and launch screen) chosen now (Android 13+).
@@ -122,14 +123,32 @@ class MainActivity : FlutterActivity() {
      * Settings meanwhile (density changes don't recreate this activity).
      */
     private fun preferFastestDisplayMode() {
-        @Suppress("DEPRECATION")
-        val display = windowManager.defaultDisplay
-        val now = display.mode
-        val fastest = display.supportedModes
+        val disp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display ?: @Suppress("DEPRECATION") windowManager.defaultDisplay
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay
+        } ?: return
+
+        val now = disp.mode ?: return
+        val modes = disp.supportedModes ?: return
+        val fastest = modes
             .filter { it.physicalWidth == now.physicalWidth && it.physicalHeight == now.physicalHeight }
-            .maxByOrNull { it.refreshRate } ?: return
-        if (window.attributes.preferredDisplayModeId == fastest.modeId) return
-        window.attributes = window.attributes.apply { preferredDisplayModeId = fastest.modeId }
+            .maxByOrNull { it.refreshRate } ?: modes.maxByOrNull { it.refreshRate } ?: return
+
+        val attrs = window.attributes
+        var changed = false
+        if (attrs.preferredDisplayModeId != fastest.modeId) {
+            attrs.preferredDisplayModeId = fastest.modeId
+            changed = true
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && attrs.preferredRefreshRate != fastest.refreshRate) {
+            attrs.preferredRefreshRate = fastest.refreshRate
+            changed = true
+        }
+        if (changed) {
+            window.attributes = attrs
+        }
     }
 
     override fun onPause() {

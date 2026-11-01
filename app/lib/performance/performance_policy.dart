@@ -83,7 +83,7 @@ class PerformanceDefaults {
         };
     return PerformanceDefaults(
       lightweight: light,
-      blur: prefs.blur ?? !light,
+      blur: prefs.blur ?? (prefs.mode == PerformanceMode.full),
       reduceMotion: !(prefs.animations ?? !light),
       petEnabled: !light,
       autoStartLocal: !light,
