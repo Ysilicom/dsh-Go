@@ -42,6 +42,28 @@ jobs:
           echo "Java version:"
           java -version
 
+      - name: Configure Custom Keystore (if secrets provided)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Custom keystore secret detected. Setting up release signing..."
+            echo "$KEYSTORE_BASE64" | base64 -d > app/android/app/release.jks
+            cp app/android/app/release.jks app/android/release.jks
+            cat <<EOF > app/android/key.properties
+            storeFile=release.jks
+            storePassword=$KEYSTORE_PASSWORD
+            keyAlias=$KEY_ALIAS
+            keyPassword=$KEY_PASSWORD
+            EOF
+            echo "Custom key.properties created successfully."
+          else
+            echo "No custom keystore secret provided. Falling back to default debug key signing."
+          fi
+
       - name: Prepare Prebuilt Runtime Assets
         run: |
           chmod +x tooling/fetch-runtime.sh tooling/build-apk.sh
@@ -54,7 +76,7 @@ jobs:
 
       - name: Build Optimized Release APK
         run: |
-          ./tooling/build-apk.sh -f arm64 --release
+          ./tooling/build-apk.sh -f arm64 --release --build-name 1.0.7
 
       - name: Collect Output APK
         id: collect
@@ -65,17 +87,17 @@ jobs:
             exit 1
           fi
           echo "Found APK: $APK_PATH"
-          cp "$APK_PATH" dsh-go-arm64-optimized.apk
-          sha256sum dsh-go-arm64-optimized.apk > dsh-go-arm64-optimized.apk.sha256
-          cat dsh-go-arm64-optimized.apk.sha256
+          cp "$APK_PATH" dsh-go-1.0.7-arm64-optimized.apk
+          sha256sum dsh-go-1.0.7-arm64-optimized.apk > dsh-go-1.0.7-arm64-optimized.apk.sha256
+          cat dsh-go-1.0.7-arm64-optimized.apk.sha256
 
       - name: Upload APK to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dsh-go-arm64-optimized
+          name: dsh-go-1.0.7-arm64-optimized
           path: |
-            dsh-go-arm64-optimized.apk
-            dsh-go-arm64-optimized.apk.sha256
+            dsh-go-1.0.7-arm64-optimized.apk
+            dsh-go-1.0.7-arm64-optimized.apk.sha256
           retention-days: 14
 
       - name: Publish Release Asset (on Tag)
@@ -83,7 +105,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dsh-go-arm64-optimized.apk
-            dsh-go-arm64-optimized.apk.sha256
+            dsh-go-1.0.7-arm64-optimized.apk
+            dsh-go-1.0.7-arm64-optimized.apk.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
